@@ -29,8 +29,15 @@ Day-11-Guardrails-HITL-Responsible-AI/
 │   │   └── attacks.py             # TODO 1-2: Adversarial prompts & AI red teaming
 │   ├── guardrails/
 │   │   ├── input_guardrails.py    # TODO 3-5: Injection detection, topic filter, plugin
-│   │   ├── output_guardrails.py   # TODO 6-8: Content filter, LLM-as-Judge, plugin
+│   │   ├── output_guardrails.py   # TODO 6-8: Content filter, plugin
+│   │   ├── llm_judge.py           # Assignment 11: Multi-criteria LLM-as-Judge
+│   │   ├── rate_limiter.py        # Assignment 11: Sliding-window rate limiter
+│   │   ├── audit_log.py           # Assignment 11: Audit logging + JSON export
+│   │   ├── monitoring.py          # Assignment 11: Metrics alerts
+│   │   ├── session_anomaly.py     # Bonus: 6th safety layer
 │   │   └── nemo_guardrails.py     # TODO 9: NeMo Guardrails with Colang
+│   ├── pipeline/
+│   │   └── defense_pipeline.py    # Assignment 11: Full pipeline + tests
 │   ├── testing/
 │   │   └── testing.py             # TODO 10-11: Before/after comparison, pipeline
 │   └── hitl/
@@ -59,24 +66,19 @@ jupyter notebook notebooks/lab11_guardrails_hitl.ipynb
 ### Local (Python modules — no Colab needed)
 
 ```bash
+# From project root (recommended)
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+export GOOGLE_API_KEY="your-api-key-here"   # or use .env in project root
+
+python main.py                     # Run the full lab
+python main.py --part 5            # Assignment 11 defense pipeline tests
+python main.py --part 5 --offline  # Same tests, no Gemini API (use if quota exhausted)
+
+# Or from src/ directly
 cd src/
-pip install -r ../requirements.txt
-export GOOGLE_API_KEY="your-api-key-here"
-
-# Run the full lab
-python main.py
-
-# Or run specific parts
-python main.py --part 1    # Part 1: Attacks
-python main.py --part 2    # Part 2: Guardrails
-python main.py --part 3    # Part 3: Testing pipeline
-python main.py --part 4    # Part 4: HITL design
-
-# Or test individual modules
-python guardrails/input_guardrails.py
-python guardrails/output_guardrails.py
-python testing/testing.py
-python hitl/hitl.py
+python main.py --part 5
 ```
 
 ### Tools Used
@@ -100,6 +102,7 @@ python hitl/hitl.py
 
 1. **Security Report**: Before/after comparison of 5+ attacks (ADK + NeMo)
 2. **HITL Flowchart**: 3 decision points with escalation paths
+3. **Assignment 11**: Production defense pipeline — see `src/pipeline/defense_pipeline.py`, `notebooks/assignment11_defense_pipeline.ipynb`, and `report.md`
 
 ## 13 TODOs
 

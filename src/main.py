@@ -8,6 +8,7 @@ Usage:
     python main.py --part 2     # Run only Part 2 (guardrails)
     python main.py --part 3     # Run only Part 3 (testing pipeline)
     python main.py --part 4     # Run only Part 4 (HITL design)
+    python main.py --part 5     # Run Assignment 11 defense pipeline tests
 """
 import sys
 import asyncio
@@ -122,16 +123,27 @@ def part4_hitl():
     test_hitl_points()
 
 
-async def main(parts=None):
+async def part5_assignment(offline: bool = False):
+    """Part 5: Assignment 11 production defense pipeline + tests."""
+    print("\n" + "=" * 60)
+    print("PART 5: Assignment 11 Defense Pipeline")
+    print("=" * 60)
+
+    from pipeline.defense_pipeline import run_all_assignment_tests
+    await run_all_assignment_tests(offline=offline)
+
+
+async def main(parts=None, offline: bool = False):
     """Run the full lab or specific parts.
 
     Args:
         parts: List of part numbers to run, or None for all
+        offline: Skip Gemini API calls for Part 5 tests
     """
     setup_api_key()
 
     if parts is None:
-        parts = [1, 2, 3, 4]
+        parts = [1, 2, 3, 4, 5]
 
     for part in parts:
         if part == 1:
@@ -142,6 +154,8 @@ async def main(parts=None):
             await part3_testing()
         elif part == 4:
             part4_hitl()
+        elif part == 5:
+            await part5_assignment(offline=offline)
         else:
             print(f"Unknown part: {part}")
 
@@ -155,12 +169,17 @@ if __name__ == "__main__":
         description="Lab 11: Guardrails, HITL & Responsible AI"
     )
     parser.add_argument(
-        "--part", type=int, choices=[1, 2, 3, 4],
-        help="Run only a specific part (1-4). Default: run all.",
+        "--part", type=int, choices=[1, 2, 3, 4, 5],
+        help="Run only a specific part (1-5). Default: run all.",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="Part 5: run without Gemini API calls (use when quota is exhausted)",
     )
     args = parser.parse_args()
 
     if args.part:
-        asyncio.run(main(parts=[args.part]))
+        asyncio.run(main(parts=[args.part], offline=args.offline))
     else:
-        asyncio.run(main())
+        asyncio.run(main(offline=args.offline))

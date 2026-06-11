@@ -65,32 +65,40 @@ class ConfidenceRouter:
         Returns:
             RoutingDecision with routing action and metadata
         """
-        # TODO 12: Implement routing logic
-        #
-        # 1. Check if action_type is in HIGH_RISK_ACTIONS
-        #    -> If yes: always escalate (action="escalate", priority="high",
-        #       requires_human=True, reason="High-risk action: {action_type}")
-        #
-        # 2. Check confidence thresholds:
-        #    - confidence >= 0.9:
-        #      action="auto_send", priority="low",
-        #      requires_human=False, reason="High confidence"
-        #
-        #    - 0.7 <= confidence < 0.9:
-        #      action="queue_review", priority="normal",
-        #      requires_human=True, reason="Medium confidence — needs review"
-        #
-        #    - confidence < 0.7:
-        #      action="escalate", priority="high",
-        #      requires_human=True, reason="Low confidence — escalating"
+        if action_type in HIGH_RISK_ACTIONS:
+            return RoutingDecision(
+                action="escalate",
+                confidence=confidence,
+                reason=f"High-risk action: {action_type}",
+                priority="high",
+                requires_human=True,
+            )
+
+        if confidence >= self.HIGH_THRESHOLD:
+            return RoutingDecision(
+                action="auto_send",
+                confidence=confidence,
+                reason="High confidence",
+                priority="low",
+                requires_human=False,
+            )
+
+        if confidence >= self.MEDIUM_THRESHOLD:
+            return RoutingDecision(
+                action="queue_review",
+                confidence=confidence,
+                reason="Medium confidence — needs review",
+                priority="normal",
+                requires_human=True,
+            )
 
         return RoutingDecision(
-            action="auto_send",
+            action="escalate",
             confidence=confidence,
-            reason="TODO: implement routing logic",
-            priority="low",
-            requires_human=False,
-        )  # TODO: Replace with implementation
+            reason="Low confidence — escalating",
+            priority="high",
+            requires_human=True,
+        )
 
 
 # ============================================================
@@ -109,27 +117,47 @@ class ConfidenceRouter:
 hitl_decision_points = [
     {
         "id": 1,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
+        "name": "Large Money Transfer Approval",
+        "trigger": "Customer requests a transfer above 10,000,000 VND or to a new beneficiary",
+        "hitl_model": "human-in-the-loop",
+        "context_needed": (
+            "Transfer amount, source/destination accounts, beneficiary history, "
+            "customer identity verification status, and recent transaction pattern"
+        ),
+        "example": (
+            "Customer asks to transfer 50,000,000 VND to a new account. "
+            "Agent must pause and route to a human banker for approval before execution."
+        ),
     },
     {
         "id": 2,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
+        "name": "Guardrail Override Review",
+        "trigger": "Input or output guardrail flags a message but confidence score is borderline (0.65–0.75)",
+        "hitl_model": "human-as-tiebreaker",
+        "context_needed": (
+            "Original user message, flagged response, guardrail rule that triggered, "
+            "confidence score, and customer account history"
+        ),
+        "example": (
+            "Topic filter flags a message about 'credit card interest' as off-topic "
+            "due to ambiguous wording. A human reviewer confirms it is a legitimate "
+            "banking question and overrides the block."
+        ),
     },
     {
         "id": 3,
-        "name": "TODO: Name this decision point",
-        "trigger": "TODO: When does this trigger?",
-        "hitl_model": "TODO: human-in-the-loop / human-on-the-loop / human-as-tiebreaker",
-        "context_needed": "TODO: What does the reviewer need to see?",
-        "example": "TODO: Give a concrete example scenario",
+        "name": "Account Closure & Data Deletion",
+        "trigger": "Customer requests account closure, password reset, or permanent data deletion",
+        "hitl_model": "human-on-the-loop",
+        "context_needed": (
+            "Customer verification (ID, OTP status), account balance, pending transactions, "
+            "linked services, and regulatory retention requirements"
+        ),
+        "example": (
+            "Customer says 'Close my account and delete all my data immediately.' "
+            "A compliance officer monitors the queue and approves only after verifying "
+            "no outstanding loans or legal holds on the account."
+        ),
     },
 ]
 

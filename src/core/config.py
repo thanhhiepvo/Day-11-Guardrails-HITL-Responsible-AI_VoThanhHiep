@@ -2,6 +2,13 @@
 Lab 11 — Configuration & API Key Setup
 """
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env from project root (parent of src/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+load_dotenv(_PROJECT_ROOT / ".env")
 
 
 def setup_api_key():

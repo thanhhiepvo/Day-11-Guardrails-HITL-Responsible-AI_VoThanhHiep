@@ -13,6 +13,22 @@ from google.adk.agents.invocation_context import InvocationContext
 from core.config import ALLOWED_TOPICS, BLOCKED_TOPICS
 
 
+# Regex patterns for prompt-injection detection (English).
+# Catches direct override attempts that topic filters alone would miss.
+INJECTION_PATTERNS = [
+    r"ignore (all )?(previous|prior|above) (instructions|directives|rules)",
+    r"you are now",
+    r"(system|hidden) prompt",
+    r"reveal (your |the )?(instructions|prompt|config)",
+    r"pretend you (are|were)",
+    r"act as (a |an )?(unrestricted|different|new)",
+    r"forget (all )?(your |previous )?(instructions|rules)",
+    r"disregard (all )?(previous|prior)",
+    r"(show|print|output) (me )?(your )?(system|hidden)",
+    r"(translate|convert|encode).*(instructions|prompt|system)",
+]
+
+
 # ============================================================
 # TODO 3: Implement detect_injection()
 #
@@ -37,16 +53,16 @@ def detect_injection(user_input: str) -> bool:
     Returns:
         True if injection detected, False otherwise
     """
-    INJECTION_PATTERNS = [
-        # TODO: Add at least 5 regex patterns
-        # Example:
-        # r"ignore (all )?(previous|above) instructions",
-    ]
+    detected, _ = detect_injection_detail(user_input)
+    return detected
 
+
+def detect_injection_detail(user_input: str) -> tuple[bool, str | None]:
+    """Detect injection and return the matched regex pattern for audit logging."""
     for pattern in INJECTION_PATTERNS:
         if re.search(pattern, user_input, re.IGNORECASE):
-            return True
-    return False
+            return True, pattern
+    return False, None
 
 
 # ============================================================
@@ -68,14 +84,26 @@ def topic_filter(user_input: str) -> bool:
     Returns:
         True if input should be BLOCKED (off-topic or blocked topic)
     """
-    input_lower = user_input.lower()
+    blocked, _ = topic_filter_detail(user_input)
+    return blocked
 
-    # TODO: Implement logic:
-    # 1. If input contains any blocked topic -> return True
-    # 2. If input doesn't contain any allowed topic -> return True
-    # 3. Otherwise -> return False (allow)
 
-    pass  # Replace with your implementation
+def topic_filter_detail(user_input: str) -> tuple[bool, str | None]:
+    """Return block decision and reason (blocked topic or off-topic)."""
+    input_lower = user_input.strip().lower()
+
+    if not input_lower:
+        return True, "empty input"
+
+    for topic in BLOCKED_TOPICS:
+        if topic in input_lower:
+            return True, f"blocked topic: {topic}"
+
+    for topic in ALLOWED_TOPICS:
+        if topic in input_lower:
+            return False, None
+
+    return True, "off-topic (no banking keywords)"
 
 
 # ============================================================
@@ -92,10 +120,12 @@ def topic_filter(user_input: str) -> bool:
 class InputGuardrailPlugin(base_plugin.BasePlugin):
     """Plugin that blocks bad input before it reaches the LLM."""
 
-    def __init__(self):
+    def __init__(self, audit_log=None):
         super().__init__(name="input_guardrail")
         self.blocked_count = 0
         self.total_count = 0
+        self.audit_log = audit_log
+        self.last_block_reason: str | None = None
 
     def _extract_text(self, content: types.Content) -> str:
         """Extract plain text from a Content object."""
@@ -127,15 +157,46 @@ class InputGuardrailPlugin(base_plugin.BasePlugin):
         """
         self.total_count += 1
         text = self._extract_text(user_message)
+        user_id = "anonymous"
+        if invocation_context and getattr(invocation_context, "user_id", None):
+            user_id = invocation_context.user_id
 
-        # TODO: Implement logic:
-        # 1. Call detect_injection(text)
-        #    - If True: increment blocked_count, return self._block_response("...")
-        # 2. Call topic_filter(text)
-        #    - If True: increment blocked_count, return self._block_response("...")
-        # 3. If both are False: return None (let message through)
+        is_injection, pattern = detect_injection_detail(text)
+        if is_injection:
+            self.blocked_count += 1
+            self.last_block_reason = f"injection pattern: {pattern}"
+            message = (
+                "I cannot process that request. Your message appears to contain "
+                "prohibited content. Please ask about VinBank banking services."
+            )
+            if self.audit_log:
+                self.audit_log.record_block(
+                    user_id=user_id,
+                    layer="input_guardrail",
+                    reason=self.last_block_reason,
+                    output=message,
+                )
+            return self._block_response(message)
 
-        pass  # Replace with your implementation
+        should_block, topic_reason = topic_filter_detail(text)
+        if should_block:
+            self.blocked_count += 1
+            self.last_block_reason = topic_reason
+            message = (
+                "I can only help with banking-related questions. How can I assist "
+                "you with your account, transactions, or savings?"
+            )
+            if self.audit_log:
+                self.audit_log.record_block(
+                    user_id=user_id,
+                    layer="input_guardrail",
+                    reason=self.last_block_reason,
+                    output=message,
+                )
+            return self._block_response(message)
+
+        self.last_block_reason = None
+        return None
 
 
 # ============================================================
